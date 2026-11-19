@@ -1,0 +1,175 @@
+<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Moneyball FM27</title><style>
+:root{color-scheme:dark;--bg:#101916;--panel:#1b2621;--line:#36463b;--lime:#d2fc77;--muted:#b0bfb5}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#f2f6f1;font:16px system-ui}header{border-bottom:1px solid var(--line);padding:20px max(5vw,20px);font-weight:800;letter-spacing:.06em}header b{background:var(--lime);color:#141d13;padding:7px 9px;border-radius:7px;margin-right:10px}main{width:min(1380px,92%);margin:38px auto}h1{font-size:clamp(2.4rem,6vw,4.5rem);margin:0;letter-spacing:-.065em}h2{margin:0 0 16px}p,small{color:var(--muted)}.hero{display:flex;justify-content:space-between;align-items:end;gap:16px;flex-wrap:wrap;margin-bottom:28px}.hero p{margin:9px 0}.panel,.stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.stat strong{display:block;font-size:1.65rem;margin-top:5px;color:var(--lime)}.row{display:flex;gap:10px;align-items:end;flex-wrap:wrap}.between{justify-content:space-between}button,input,select{font:inherit;color:inherit;border:1px solid var(--line);border-radius:8px;background:#121c17;padding:9px 11px}button{cursor:pointer;font-weight:650}button:hover{border-color:var(--lime)}button:disabled{opacity:.45;cursor:default}.primary{background:var(--lime);color:#152011;border-color:var(--lime)}label{display:grid;gap:6px;color:var(--muted);font-size:.9rem}label input,label select{color:#fff;min-width:0;width:100%}.scroll{overflow:auto}table{border-collapse:collapse;width:100%;white-space:nowrap;font-size:.91rem}th,td{padding:12px 10px;text-align:left;border-bottom:1px solid var(--line)}th{color:var(--muted)} th:first-child,td:first-child{position:sticky;left:0;background:var(--panel);z-index:1} summary{cursor:pointer;font-weight:750}td:first-child{font-weight:750}dialog{background:var(--panel);color:#fff;border:1px solid var(--line);border-radius:14px;width:min(720px,94vw);max-height:90vh;padding:22px}dialog::backdrop{background:#000a}.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:12px;margin:16px 0}.status{min-height:24px}.empty{text-align:center;padding:26px;color:var(--muted)}@media(max-width:600px){main{margin-top:25px}.stats{gap:5px}.stat{padding:9px}.stat strong{font-size:1.25rem}}
+</style><header><b>MB</b> MONEYBALL FM27</header><main><div class="hero"><div><h1>Seu mercado de jogadores</h1><p>Compare a produção do seu elenco e dos alvos por função, minutagem e custo.</p></div><div class="row"><button id="import">Importar arquivo</button><button class="primary" id="add">Novo jogador</button><input id="file" type="file" accept=".csv,.html,.htm,.rtf" hidden></div></div>
+<div class="stats"><div class="stat">Jogadores<strong id="total"></strong></div><div class="stat">Alvos na seleção<strong id="targets"></strong></div><div class="stat">Do seu elenco<strong id="own"></strong></div></div>
+<details class="panel"><summary>Filtros por coluna</summary><p>Use intervalos para números e busca para texto. Os filtros ativos se combinam.</p><div id="filterRows"></div><div class="row"><button id="addFilter">Adicionar filtro</button><button id="clearFilters">Limpar filtros</button></div></details><section class="panel"><div class="row between"><h2>Lista de jogadores</h2><div class="row">Exportar seleção <button data-format="html">HTML</button><button data-format="rtf">RTF</button><button data-format="csv">CSV</button></div></div><div class="row"><label>Buscar<input id="q" placeholder="Nome, clube ou liga"></label><label>Posição<select id="position"><option value="">Todas</option></select></label><label>Grupo<select id="group"><option value="">Todos</option><option>Alvo</option><option>Meu elenco</option></select></label><label>Mínimo de minutos<input id="min" type="number" min="0" value="0"></label><label>Ordenar por<select id="order"><option value="name">Nome</option><option value="g90">Gols s/ pênalti /90</option><option value="xg">xG s/ pênalti /90</option><option value="xa">xA /90</option><option value="passes">Passes decisivos /90</option><option value="cost">Custo do 1º ano</option><option value="minutes">Minutos</option></select></label></div><p id="status" class="status" role="status"></p><div class="scroll"><table><thead><tr><th>Ações</th></tr></thead><tbody id="body"></tbody></table></div><p><small>Importação de CSV e tabelas HTML com cabeçalhos reconhecidos. RTF pode ser reimportado quando gerado por este painel. Dados salvos neste navegador. Os 83 campos da planilha são exportados na ordem informada. Os campos extras da versão anterior ficam disponíveis ao editar.</small></p><button id="demo">Carregar exemplo</button></section>
+</main><dialog id="editor"><form id="form"><h2 id="formTitle">Novo jogador</h2><div class="fields" id="fields"></div><div class="row"><button type="button" id="cancel">Cancelar</button><button class="primary">Salvar jogador</button></div></form></dialog>
+<script>
+const previousFields=[
+ ['name','Jogador'],['club','Clube'],['league','Liga'],['season','Temporada'],['position','Posição'],['role','Função'],['group','Grupo'],
+ ['minutes','Minutos',1],['goals','Gols sem pênalti',1],['xg','xG sem pênalti /90',1],['xa','xA /90',1],['passes','Passes decisivos em jogo corrido /90',1],['fee','Taxa (R$)',1],['wage','Salário mensal (R$)',1],['extra','Outros custos no 1º ano (R$)',1],['notes','Observações']
+];
+const columns=[["name","Nome",0,"Cadastro"],["age","Idade",1,"Cadastro"],["nation","Nação",0,"Cadastro"],["club","Clube",0,"Cadastro"],["market","Valor estimado",0,"Cadastro"],["position","Posição",0,"Cadastro"],["wage","Salário",1,"Cadastro"],["contract","Fim de contrato",0,"Cadastro"],["allGoals","Gols",1,"Cadastro"],["aerialReach","Alcance aéreo",1,"Goleiro"],["command","Comando de área",1,"Goleiro"],["communication","Comunicação",1,"Goleiro"],["eccentricity","Excentricidade",1,"Goleiro"],["handling","Segurar a bola",1,"Goleiro"],["kicking","Distribuição",1,"Goleiro"],["oneOnOne","Cara a cara",1,"Goleiro"],["punch","Socar a bola",1,"Goleiro"],["reflexes","Reflexos",1,"Goleiro"],["rushing","Saída do gol",1,"Goleiro"],["throwing","Distribuição com as mãos",1,"Goleiro"],["aggression","Agressividade",1,"Mental"],["anticipation","Antecipação",1,"Mental"],["bravery","Coragem",1,"Mental"],["composure","Frieza",1,"Mental"],["concentration","Concentração",1,"Mental"],["decisions","Decisões",1,"Mental"],["determination","Determinação",1,"Mental"],["flair","Imprevisibilidade",1,"Mental"],["leadership","Liderança",1,"Mental"],["offBall","Movimentação sem bola",1,"Mental"],["positioning","Posicionamento defensivo",1,"Mental"],["teamwork","Trabalho em equipe",1,"Mental"],["vision","Visão de jogo",1,"Mental"],["workRate","Esforço",1,"Mental"],["acceleration","Aceleração",1,"Físico"],["agility","Agilidade",1,"Físico"],["balance","Equilíbrio",1,"Físico"],["jump","Alcance de salto",1,"Físico"],["fitness","Aptidão física",1,"Físico"],["pace","Velocidade",1,"Físico"],["stamina","Resistência",1,"Físico"],["strength","Força",1,"Físico"],["corners","Escanteio",1,"Técnicos"],["crossing","Cruzamento",1,"Técnicos"],["dribbling","Drible",1,"Técnicos"],["finishing","Finalização",1,"Técnicos"],["firstTouch","Primeiro toque",1,"Técnicos"],["freeKick","Falta",1,"Técnicos"],["heading","Cabeceio",1,"Técnicos"],["longShots","Chute de longe",1,"Técnicos"],["longThrows","Laterais longos",1,"Técnicos"],["marking","Marcação",1,"Técnicos"],["passing","Passe",1,"Técnicos"],["penalties","Cobrança de pênaltis",1,"Técnicos"],["tackling","Desarme",1,"Técnicos"],["technique","Técnica",1,"Técnicos"],["aerialDuels","Duelos aéreos",1,"Desempenho"],["headersWon","Cabeceios ganhos",1,"Desempenho"],["duelPct","% duelos ganhos",1,"Desempenho"],["games","Jogos",1,"Desempenho"],["assists","Assistência",1,"Desempenho"],["minsPerGoal","Média de minutos por gol",1,"Desempenho"],["rating","Nota média",1,"Desempenho"],["expectedAssists","Assistências esperadas",1,"Desempenho"],["duelsAttempted","Duelos tentados",1,"Desempenho"],["headersWon2","Cabeceios ganhos",1,"Desempenho"],["headerRate","Índice de cabeceios ganhos",1,"Desempenho"],["crossAttempts","Cruzamentos tentados",1,"Desempenho"],["crossPct","% cruzamentos certos",1,"Desempenho"],["dribblesMade","Dribles feitos",1,"Desempenho"],["keyPasses","Passes decisivos",1,"Desempenho"],["progressivePasses","Passes progressivos",1,"Desempenho"],["conversion","Taxa de conversão de finalização",1,"Desempenho"],["outsideGoals","Gols de fora da área",1,"Desempenho"],["shots","Finalização",1,"Desempenho"],["interceptions90","Interceptações por 90 minutos",1,"Desempenho"],["keyTackles90","Desarmes decisivos por 90 minutos",1,"Desempenho"],["possessionWon90","Posse de bola ganha por 90 minutos",1,"Desempenho"],["pressures90","Pressões bem-sucedidas por 90 minutos",1,"Desempenho"],["blocks90","Chutes bloqueados na defesa por 90 minutos",1,"Desempenho"],["tacklesAttempted","Desarmes tentados",1,"Desempenho"],["tacklePct","% de desarmes certos",1,"Desempenho"],["permit","Visto de trabalho necessário",0,"Elegibilidade"]];
+const fields=[...columns,...previousFields.filter(([k])=>!columns.some(c=>c[0]===k))];
+const $=id=>document.getElementById(id);
+const key='moneyball-fm27-v1';
+let data=[];try{data=JSON.parse(localStorage.getItem(key)||'[]')}catch{}
+let editing=null;
+const filterRows=$('filterRows');
+for(const c of columns)if(!$('order').querySelector('option[value="'+c[0]+'"]'))$('order').add(new Option(c[3]+' · '+c[1]+(c[0]==='headersWon2'?' (2ª coluna)':''),c[0]));
+const labelFor=([k,l,,g])=>g+' · '+l+(k==='headersWon'?' (1ª coluna)':k==='headersWon2'?' (2ª coluna)':'');
+$('addFilter').onclick=()=>{
+ const row=document.createElement('div');row.className='row';row.style.marginBottom='10px';
+ row.innerHTML='<label>Coluna<select>'+columns.map(c=>'<option value="'+c[0]+'">'+esc(labelFor(c))+'</option>').join('')+'</select></label><label>Valor ou mínimo<input></label><label hidden>Máximo<input></label><button>Remover</button>';
+ const [select,min,max,remove]=row.querySelectorAll('select,input,button');
+ select.onchange=()=>{const n=columns.find(c=>c[0]===select.value)[2];min.type=max.type=n?'number':'text';min.step=max.step='any';max.parentElement.style.display=n?'grid':'none';min.value=max.value='';render()};
+ remove.onclick=()=>{row.remove();render()};row.addEventListener('input',render);filterRows.append(row);select.onchange();
+};
+$('clearFilters').onclick=()=>{filterRows.replaceChildren();render()};
+function matchesColumns(p){
+ return [...filterRows.children].every(row=>{
+ const [select,min,max]=row.querySelectorAll('select,input');const v=p[select.value];
+ if(min.type==='number')return (!min.value&&!max.value)||(Number.isFinite(v)&&(!min.value||v>=Number(min.value))&&(!max.value||v<=Number(max.value)));
+ return !min.value||clean(v).includes(clean(min.value));
+ });
+}
+
+const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const per90=p=>p.minutes>0&&p.goals!=null?p.goals*90/p.minutes:null;
+const cost=p=>[p.fee,p.wage,p.extra].every(Number.isFinite)?p.fee+12*p.wage+p.extra:null;
+const fmt=x=>x==null?'—':x.toLocaleString('pt-BR',{maximumFractionDigits:2});
+const money=x=>x==null?'—':x.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const value=(p,k)=>k==='g90'?per90(p):k==='cost'?cost(p):p[k];
+const clean=x=>String(x??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+function compareRows(a,b,k){
+ const x=value(a,k),y=value(b,k);
+ if(x==null||x==='')return y==null||y===''?0:1;
+ if(y==null||y==='')return -1;
+ if(Number.isFinite(x)&&Number.isFinite(y))return k==='cost'?x-y:y-x;
+ return String(x).localeCompare(String(y),'pt-BR',{numeric:true});
+}
+function visible(){
+ const k=$('order').value;
+ return data.filter(p=>matchesColumns(p)&&clean([p.name,p.club,p.league,p.role].join(' ')).includes(clean($('q').value))&&(!$('position').value||p.position===$('position').value)&&(!$('group').value||p.group===$('group').value)&&(!+$('min').value||p.minutes>=+$('min').value)).sort((a,b)=>compareRows(a,b,k));
+}
+function save(){try{localStorage.setItem(key,JSON.stringify(data))}catch{$('status').textContent='Armazenamento indisponível. Exporte uma cópia antes de fechar.'}render()}
+function render(){
+ const pos=$('position').value;
+ $('position').innerHTML='<option value="">Todas</option>'+[...new Set(data.map(p=>p.position).filter(Boolean))].sort().map(p=>'<option>'+esc(p)+'</option>').join('');
+ if([...$('position').options].some(o=>o.value===pos))$('position').value=pos;
+ const rows=visible();
+ document.querySelector('thead tr').innerHTML=columns.map(c=>'<th title="'+esc(labelFor(c))+'">'+esc(c[1])+'</th>').join('')+'<th>Ações</th>';
+ $('total').textContent=rows.length+' / '+data.length;
+ $('targets').textContent=rows.filter(p=>p.group==='Alvo').length;
+ $('own').textContent=rows.filter(p=>p.group==='Meu elenco').length;
+ document.querySelectorAll('[data-format]').forEach(b=>b.disabled=!rows.length);
+ $('body').innerHTML=rows.map(p=>'<tr>'+columns.map(([k])=>p[k]).map(x=>'<td>'+esc(x==null||x===''?'—':x)+'</td>').join('')+'<td><button data-edit="'+esc(p.id)+'">Editar</button> <button data-delete="'+esc(p.id)+'">Excluir</button></td></tr>').join('')||'<tr><td class="empty" colspan="'+(columns.length+1)+'">Nenhum jogador nesta seleção.</td></tr>';
+}
+function openForm(p){
+ editing=p?.id??null;$('formTitle').textContent=p?'Editar jogador':'Novo jogador';
+ $('fields').innerHTML=fields.map(c=>{const [k,label,n]=c;return '<label>'+(c[3]?labelFor(c):label)+(k==='group'?'<select name="group"><option>Alvo</option><option>Meu elenco</option></select>':'<input name="'+k+'" '+(n?'inputmode="decimal" ':'')+(k==='name'?'required ':'')+'value="'+esc(p?.[k])+'">')+'</label>'}).join('');
+ $('form').elements.group.value=p?.group||'Alvo';$('editor').showModal();
+}
+$('form').onsubmit=e=>{
+ e.preventDefault();const f=new FormData(e.target);const p={id:editing||crypto.randomUUID()};
+ fields.forEach(([k,,n])=>{const v=f.get(k).trim();p[k]=n?readNumber(v):v});
+ if(!p.name){e.target.elements.name.focus();return}
+ data=editing?data.map(r=>r.id===editing?p:r):[...data,p];$('editor').close();save();
+};
+$('add').onclick=()=>openForm();$('cancel').onclick=()=>$('editor').close();
+$('body').onclick=e=>{
+ const p=data.find(r=>r.id===(e.target.dataset.edit||e.target.dataset.delete));
+ if(!p)return;
+ if(e.target.dataset.edit)openForm(p);
+ else if(confirm('Excluir '+p.name+'?')){data=data.filter(r=>r.id!==p.id);save()}
+};
+for(const id of ['q','position','group','min','order'])$(id).addEventListener('input',render);
+function matrix(){
+ return [columns.map(f=>f[1]),...visible().map(p=>columns.map(([k])=>p[k]))];
+}
+function csvCell(x){
+ const s=String(x??'');return '"'+(typeof x==='string'&&/^\s*[=+\-@]/.test(s)?"'"+s:s).replaceAll('"','""')+'"';
+}
+function rtfCell(x){
+ return String(x??'').replace(/[\\{}\r\n\u0080-\uffff]/g,c=>c==='\r'?'':c==='\n'?'\\line ':/[\\{}]/.test(c)?'\\'+c:'\\u'+(c.charCodeAt(0)>32767?c.charCodeAt(0)-65536:c.charCodeAt(0))+'?');
+}
+function report(type,rows){
+ if(type==='csv')return '\ufeff'+rows.map(r=>r.map(csvCell).join(';')).join('\r\n');
+ if(type==='html')return '<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Moneyball FM27</title><style>body{font:16px system-ui;margin:24px}td,th{padding:8px;border:1px solid #ccc}table{border-collapse:collapse}th{background:#e6f2ce}</style><h1>Moneyball FM27</h1><table>'+rows.map((r,i)=>'<tr>'+r.map(x=>i?'<td>'+esc(x)+'</td>':'<th>'+esc(x)+'</th>').join('')+'</tr>').join('')+'</table></html>';
+ return '{\\rtf1\\ansi\\uc1{\\fonttbl{\\f0 Arial;}}\\f0\\fs22\\b Moneyball FM27\\b0\\par\n'+rows.slice(1).map(r=>'\\par \\b '+rtfCell(r[0])+'\\b0\\par\n'+r.map((x,i)=>true?rtfCell(rows[0][i]+': '+(x??''))+'\\par\n':'').join('')).join('')+'}';
+}
+document.querySelectorAll('[data-format]').forEach(b=>b.onclick=()=>{
+ const type=b.dataset.format;const url=URL.createObjectURL(new Blob([report(type,matrix())],{type:{csv:'text/csv',html:'text/html',rtf:'application/rtf'}[type]}));
+ const a=document.createElement('a');a.href=url;a.download='moneyball-fm27.'+type;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+});
+function parseCsv(t){
+ t=t.replace(/^\ufeff/,'');const first=t.split(/\r?\n/,1)[0];const sep=first.includes(';')?';':first.includes('\t')?'\t':',';
+ const rows=[];let row=[],cell='',quoted=false;
+ for(let i=0;i<t.length;i++){
+ const c=t[i];if(c==='"'){if(quoted&&t[i+1]==='"'){cell+='"';i++}else quoted=!quoted}
+ else if(!quoted&&(c===sep||c==='\n')){row.push(cell.replace(/\r$/,''));cell='';if(c==='\n'){rows.push(row);row=[]}}
+ else cell+=c;
+ }
+ if(quoted)throw Error('CSV com aspas incompletas.');
+ if(cell||row.length)rows.push([...row,cell.replace(/\r$/,'')]);return rows;
+}
+function parseRtf(t){
+ const rows=[];let row=null;
+ for(const line of t.split('\n')){
+ if(line.startsWith('\\par \\b ')){if(row)rows.push(row);row=[];continue}
+ if(!row||!line.endsWith('\\par'))continue;
+ const decoded=line.slice(0,-4).replace(/\\u(-?\d+)\?|\\line |\\([\\{}])/g,(m,n,c)=>n!==undefined?String.fromCharCode(Number(n)):c||'\n');
+ const cut=decoded.indexOf(': ');if(cut>=0)row.push([decoded.slice(0,cut),decoded.slice(cut+2)]);
+ }
+ if(row)rows.push(row);
+ const schema=rows.some(r=>r.some(([label])=>label==='Nome'))?columns:previousFields;
+ const head=schema.map(f=>f[1]);return [head,...rows.map(r=>{
+ const counts=new Map();return head.map(h=>{const i=counts.get(h)||0;counts.set(h,i+1);return r.filter(([label])=>label===h)[i]?.[1]||''});
+ })];
+}
+const aliases={name:['nome','jogador','name','player'],club:['clube','club','team'],league:['liga','league','division','divisao'],season:['season'],position:['pos','position'],role:['role'],group:['group'],minutes:['minutes','mins','min','minutos jogados'],goals:['non penalty goals','npg','gols s/ pen'],xg:['npxg/90','np xg/90','non-penalty xg per 90'],xa:['xa/90','xa per 90'],passes:['open play key passes per 90'],notes:['notes']};
+function readNumber(t){
+ if(!t||/^[—–-]$/.test(t))return null;
+ let s=t.replace(/R\$|%|\s/g,'');if(s.includes(','))s=s.replaceAll('.','').replace(',','.');
+ const n=Number(s);if(!Number.isFinite(n)||n<0)return t;return n;
+}
+function imported(rows){
+ const h=(rows[0]||[]).map(clean);
+ const ordered=h.length===columns.length&&['nome','jogador','name','player'].includes(h[0])&&['idade','age'].includes(h[1]);
+ const used=new Set();
+ const cols=fields.map(([k,l],i)=>{
+ const idx=ordered?(i<columns.length?i:-1):h.findIndex((v,j)=>!used.has(j)&&(v===clean(l)||aliases[k]?.includes(v)||v===k||(k==='wage'&&v==='salario mensal (r$)')));
+ if(idx>=0)used.add(idx);return idx;
+ });
+ if(cols[0]<0)throw Error('Cabeçalho de jogador ausente. Use “Jogador”, “Nome” ou “Name”.');
+ return rows.slice(1).filter(r=>r[cols[0]]?.trim()).map(r=>{
+ const p={id:crypto.randomUUID()};
+ fields.forEach(([k,,n],i)=>{const v=String(r[cols[i]]??'').trim();p[k]=n?readNumber(v):v});
+ p.group=p.group==='Meu elenco'?'Meu elenco':'Alvo';return p;
+ });
+}
+$('import').onclick=()=>$('file').click();
+$('file').onchange=async e=>{
+ const f=e.target.files[0];if(!f)return;
+ try{
+ const t=await f.text();let rows;
+ if(/\.html?$/i.test(f.name)){
+ const d=new DOMParser().parseFromString(t,'text/html');
+ rows=[...d.querySelectorAll('tr')].map(r=>[...r.cells].map(c=>c.textContent.trim()));
+ const header=rows.findIndex(r=>r.some(x=>['nome','jogador','name','player'].includes(clean(x))));if(header>=0)rows=rows.slice(header);
+ }else rows=/\.rtf$/i.test(f.name)?parseRtf(t):parseCsv(t);
+ const list=imported(rows);if(!list.length)throw Error('O arquivo não contém jogadores reconhecíveis.');
+ data=[...data,...list];$('status').textContent=list.length+' jogador(es) importado(s).';save();
+ }catch(err){$('status').textContent=err.message}finally{e.target.value=''}
+};
+$('demo').onclick=()=>{
+ if(data.some(p=>p.demo)){$('status').textContent='O exemplo já está na lista.';return}
+ data.push(...[
+ {name:'Bruno Ribeiro',club:'Atlético do Vale',minutes:450,goals:4,xg:.34,fee:1200000,wage:30000,group:'Alvo'},
+ {name:'Caio Freitas',club:'União do Norte',minutes:2160,goals:12,xg:.48,fee:600000,wage:20000,group:'Alvo'},
+ {name:'Lucas Vidal',club:'Seu clube',minutes:1800,goals:7,xg:.37,fee:0,wage:14000,group:'Meu elenco'}
+ ].map(p=>({...p,id:crypto.randomUUID(),position:'Atacante',role:'Centroavante',extra:0,demo:true,notes:'Jogador fictício para demonstração.'})));
+ $('status').textContent='Três jogadores fictícios adicionados.';save();
+};
+render();
+</script></html>

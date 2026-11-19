@@ -1,0 +1,24 @@
+{
+  "name": "moneyball-fm27",
+  "version": "1.0.0",
+  "description": "Moneyball FM27 - painel desktop para análise de jogadores",
+  "main": "main.js",
+  "author": "Moneyball FM27",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis portable"
+  },
+  "devDependencies": {
+    "electron": "^39.2.7",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "br.moneyball.fm27",
+    "productName": "Moneyball FM27",
+    "directories": { "output": "release" },
+    "files": ["main.js", "dist/**/*", "README.md"],
+    "win": { "target": ["nsis", "portable"], "artifactName": "Moneyball-FM27-${version}-${arch}.${ext}" },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "createDesktopShortcut": true, "createStartMenuShortcut": true }
+  }
+}
