@@ -9,13 +9,9 @@ function createWindow() {
     minHeight: 650,
     backgroundColor: '#101916',
     title: 'Moneyball FM27',
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true
-    }
+    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true }
   });
-  win.loadFile(path.join(__dirname, 'dist', 'index.html'));
+  win.loadFile(path.join(__dirname, 'index.html'));
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:/i.test(url)) shell.openExternal(url);
     return { action: 'deny' };
